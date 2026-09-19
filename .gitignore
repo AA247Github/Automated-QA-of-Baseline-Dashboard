@@ -1,0 +1,7 @@
+projects/
+outputs/web_runs/
+SOPs/
+.vscode/
+dashboard_qa/__pycache__/
+__pycache__/
+accuracy_check/__pycache__/
