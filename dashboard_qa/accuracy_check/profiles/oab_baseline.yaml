@@ -1,0 +1,57 @@
+# Identifies this profile when Auto-detect is selected.
+name: Pierre Fabre OAB baseline
+match_keywords:
+  - oab
+  - pierre
+  - fabre
+  - overactive
+  - bladder
+# Controls which source columns appear on each evidence sheet.
+evidence_mode: key_columns
+always_include_columns:
+  - ID
+  - Age in years
+  - Gender
+  - Cohort (0/1/2/3/4)
+  - Authorised for review
+  - In cohort (0/1)
+  - Criteria met (1/0)
+  - Audit cohort as per clinical protocol
+  - Current Antimuscarinic treatment (1/0)
+  - Current Beta-3 Adrenoceptor Agonist (1/0)
+  - Evidence of past OAB treatment (1/0)
+  - Diagnosis confirmed on screening
+  - Recommendation for further assessment
+
+# Connects SQL metric names to wording used in the PDF.
+dashboard_labels:
+  PatientsIdentifiedInBaseline:
+    - patients identified in baseline search results
+    - patients identified in baseline
+  PatientsEligibleForReviewAfterScreening:
+    - patients eligible for review after screening
+    - patients eligible for review
+
+# Adds OAB-specific consistency checks alongside the SQL calculations.
+helper_checks:
+  - id: in_cohort_eq_cohort_1to4
+    name: In cohort (0/1) matches Cohort in 1-4
+    left: "O2PR_InCohort01 = 1"
+    right: "O2PR_Cohort01234 in (1, 2, 3, 4)"
+    description: Helper used by headline eligible KPI must follow the cohort allocation column.
+  - id: criteria_eq_in_cohort
+    name: Criteria met matches In cohort
+    left: "O2PR_CriteriaMet10 = 1"
+    right: "O2PR_InCohort01 = 1"
+  - id: authorised_only_when_in_cohort
+    name: Authorised patients are in a clinical cohort
+    kind: implies
+    left: "O2PR_AuthorisedForReview = 1"
+    right: "O2PR_InCohort01 = 1"
+
+# Records interpretation points in the generated report.
+notes:
+  - "SQL gender: 1 = Male, 2 = Female. CSV usually stores Male/Female; the engine maps both."
+  - "SQL authorised = 1. CSV usually stores Y/N; the engine maps both."
+  - "EVENT_ID and tbl_Numbers joins are ignored because the CSV is already one event extract."
+  - "Three in-cohort patients with Authorised = N are correctly excluded from eligible and cohort charts."

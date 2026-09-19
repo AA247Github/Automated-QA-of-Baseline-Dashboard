@@ -1,0 +1,123 @@
+# Identifies this profile when Auto-detect is selected.
+# Auto-detect scores every profile by counting how many of its match_keywords
+# appear in: service name + therapy area + dashboard type + the uploaded file
+# names. Type e.g. "Chiesi Asthma Review" into Service name on the web form
+# and this profile will win over oab_baseline.yaml. Or just pick
+# "Chiesi Asthma baseline" directly from the profile dropdown.
+name: Chiesi Asthma baseline
+match_keywords:
+  - chiesi
+  - asthma
+  - respiratory
+  - copd
+  - inhaler
+
+# Controls which source columns appear on each evidence sheet.
+# Verified against the real header row of CLIICS_Upload_-_columns.csv and
+# cross-checked against SQL_Column_Mapping_-_Asthma.xlsx (both supplied
+# 2026-09-18). Add/remove columns freely — this list only controls what's
+# shown on the evidence sheet, it doesn't drive the calculations.
+evidence_mode: key_columns
+always_include_columns:
+  - ID
+  - Age in years
+  - Gender (CALC)
+  - "Patient Cohort Number (0, 1,2,3,4,5)"
+  - Overall patient cohort
+  - Overall Asthma Control Category
+  - Meeting Audit Criteria
+  - Criteria met (1/0)
+  - Patient Screened (1/0)
+  - Screening Intervention Authorised (1/0)
+  - Invited (1/0)
+  - Contact (1/0)
+  - Exclusion State
+  - Opt-out Patients
+
+# Connects SQL metric names to the wording used in Chiesi's dashboard PDF.
+# Keyed by the real Metric ID values from QA_Evidence_5.xlsx's 00_Summary
+# sheet (that's what apply_dashboard_values looks up first), and every
+# phrase below was tested against the actual Chiesi_Asthma_Dashboard.pdf
+# text and confirmed to resolve to the correct number, not just a
+# plausible-looking one. See the accompanying explanation for how these
+# were verified and why some deliberately aren't here yet.
+dashboard_labels:
+  # "95% (325 of 341) patients ... have a record of at least one objective
+  # test" — the specific KPI originally reported as reading "95" instead of
+  # 325. No metric_id in the current evidence file computes this one (it
+  # isn't extracted as its own SQL metric), so this entry is ready for
+  # whichever metric_id ends up representing it once that's resolved.
+  ObjectiveTestEvidence:
+    - record of at least one objective test
+
+  Headline_KPIs_Smoking_status_recorded:
+    - smoking status recorded in
+  Headline_KPIs_Smoking_status_recorded_2:
+    - smoking status recorded in
+  Headline_KPIs_WITH:
+    - smoking status recorded in
+
+  Headline_KPIs_WITH_2:
+    - record of inhaler technique in past 12
+  Headline_KPIs_Assessment_of_inhaler_technique:
+    - record of inhaler technique in past 12
+
+  Headline_KPIs_No_record_5:
+    - no record of personalised
+
+  Headline_KPIs_WITH_3:
+    - record of act in the past 12
+  Headline_KPIs_Assessment_of_asthma_control:
+    - record of act in the past 12
+
+  # TODO — deliberately NOT added yet, see explanation:
+  # Headline_KPIs_FeNO / _2 / _5 / _6, Headline_KPIs_Eosinophils / _2,
+  # Headline_KPIs_Spirometry / _2, Headline_KPIs_PEFR / _2 (the "Evidence
+  # of tests for asthma diagnosis" bar chart). A bare "FeNO"/"Eosinophils"
+  # alias technically CAN resolve each variant correctly (tested), but the
+  # Eosinophils CSV replication (341, from "EosinophilDate is not null")
+  # doesn't match the dashboard's real figure (296) — a genuine data/SQL
+  # logic issue, not a labelling one. Adding a label there right now risks
+  # a false MATCH by coincidentally finding 341 (the total register size)
+  # sitting nearby, which would mask that real discrepancy instead of
+  # surfacing it. Fix the underlying SQL/logic first, then label it.
+
+# Adds asthma-specific consistency checks alongside the SQL calculations.
+# These three use REAL SQL aliases from SQL_Column_Mapping_-_Asthma.xlsx
+# (prefix A2PR_, mirroring Pierre Fabre's O2PR_ prefix), chosen as the
+# closest asthma equivalents to the three OAB checks in oab_baseline.yaml:
+#   - "In cohort" / "Criteria met" agreement  -> Meeting Audit Criteria / Criteria met
+#   - Authorisation implies cohort membership -> Screening authorised implies meeting criteria
+# IMPORTANT: I inferred these pairings from column names and the OAB
+# pattern, not from Chiesi's actual SQL logic or a clinician's sign-off.
+# Have whoever owns the Chiesi audit protocol confirm these are the right
+# pairs (and the right direction) before relying on the results.
+helper_checks:
+  - id: criteria_met_eq_meeting_audit_criteria
+    name: Criteria met matches Meeting Audit Criteria
+    left: "A2PR_CriteriaMet = 1"
+    right: "A2PR_MeetAuditCriteria = 1"
+    description: Mirrors the OAB "Criteria met matches In cohort" check — confirm this is the right pairing for asthma before relying on it.
+  - id: screening_authorised_implies_meeting_criteria
+    name: Screening-authorised patients meet audit criteria
+    kind: implies
+    left: "A2PR_ScreeningIntAuth = 1"
+    right: "A2PR_MeetAuditCriteria = 1"
+    description: Mirrors the OAB "Authorised patients are in a clinical cohort" check.
+  - id: invited_implies_meeting_criteria
+    name: Invited patients meet audit criteria
+    kind: implies
+    left: "A2PR_Invited = 1"
+    right: "A2PR_MeetAuditCriteria = 1"
+    description: Patients invited to clinic should already meet the audit criteria — confirm this holds for Chiesi's workflow (some services invite before final screening).
+  # Add/remove checks freely; delete any that don't reflect the real
+  # protocol, and add ones for exclusion logic (Exclusion: COPD,
+  # Exclusion: Under 18, Exclusion: Palliative, Exclusion State) if those
+  # should drive eligibility too.
+
+# Records interpretation points in the generated report.
+notes:
+  - "UNCONFIRMED: Gender (CALC) is a derived/calculated field in this CSV (unlike Pierre Fabre's raw SQL 1/2 coding) — confirm what text/values it actually holds (e.g. Male/Female, M/F) before assuming the engine's built-in gender mapping covers it."
+  - "SQL authorised fields in this mapping (Screening Intervention Authorised (1/0), Patient Screened (1/0), Invited (1/0), Contact (1/0)) all appear to already be 1/0 in the CSV, not Y/N — double check a real data export to confirm."
+  - "11 columns in SQL_Column_Mapping_-_Asthma.xlsx do not resolve to any header in CLIICS_Upload_-_columns.csv (naming drift, e.g. underscores vs spaces, and a few genuinely missing PO Prednisolone columns) — see the accompanying findings doc. Any SQL metric or helper check that depends on one of those will show as unmapped/ERROR until the mapping workbook or CSV export is corrected."
+  - "EVENT_ID and tbl_Numbers joins are ignored because the CSV is already one event extract (carried over from the OAB profile's assumption — confirm this also holds for the asthma dashboard SQL)."

@@ -1,0 +1,11 @@
+# Data, workbook and profile handling
+pandas>=2.0
+openpyxl>=3.1
+PyYAML>=6.0
+
+# Dashboard and SQL document reading
+pypdf>=4.0
+python-docx>=1.1
+
+# Local HTML interface
+Flask>=2.2

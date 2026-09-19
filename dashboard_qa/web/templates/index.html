@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard accuracy check</title>
+  <style>
+    /* Shared colours and layout for the single-page local interface. */
+    :root {
+      --ink: #142033;
+      --muted: #5b6778;
+      --line: #d5dbe3;
+      --paper: #f4f6f8;
+      --card: #ffffff;
+      --accent: #1f4e79;
+      --accent-2: #0f6b57;
+      --danger: #9b2c2c;
+      --warn: #8a6d1b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Calibri, system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    header {
+      background: var(--accent);
+      color: #fff;
+      padding: 22px 28px 20px;
+    }
+    header h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 650;
+    }
+    header p {
+      margin: 0;
+      max-width: 760px;
+      color: #d7e4f0;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.1fr);
+      gap: 20px;
+      padding: 20px 24px 40px;
+      align-items: start;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px 18px 16px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input[type="text"], select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    .files {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .drop {
+      border: 1px dashed #9aa8b8;
+      border-radius: 6px;
+      padding: 12px;
+      min-height: 108px;
+      background: #fafcfe;
+      cursor: pointer;
+    }
+    .drop:hover, .drop.over { border-color: var(--accent); background: #eef4fa; }
+    .drop strong { display: block; font-size: 13px; margin-bottom: 4px; }
+    .drop span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+    .drop .picked {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--accent-2);
+      word-break: break-all;
+    }
+    .drop input { display: none; }
+    .options {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin: 14px 0 12px;
+      font-size: 13px;
+    }
+    button.run {
+      width: 100%;
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button.run:disabled { opacity: 0.55; cursor: wait; }
+    button.run:hover:not(:disabled) { background: #173a5b; }
+    .hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .stat b { display: block; font-size: 22px; line-height: 1.1; }
+    .stat small { color: var(--muted); font-size: 11px; }
+    .stat.match b { color: var(--accent-2); }
+    .stat.mismatch b { color: var(--danger); }
+    .stat.review b { color: var(--warn); }
+    .downloads { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .downloads a {
+      display: inline-block;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      background: #f7fafc;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 6px 6px;
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 650; }
+    .pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 650;
+    }
+    .MATCH { background: #d9f3e6; color: #0f6b57; }
+    .CSV_ONLY { background: #fff3cc; color: #8a6d1b; }
+    .MISMATCH, .ERROR, .FAIL { background: #f8d4d4; color: #9b2c2c; }
+    .PASS { background: #d9f3e6; color: #0f6b57; }
+    .empty { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .error-banner {
+      background: #fdecec;
+      color: var(--danger);
+      border: 1px solid #f0c2c2;
+      padding: 10px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .meta { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+    .table-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .fields, .files, .stats { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Introduces the purpose of the local checking tool. -->
+  <header>
+    <h1>Dashboard accuracy check</h1>
+    <p>
+      Upload the four source files for any service or therapy area. The tool rebuilds every SQL count
+      from the CLIICS export, compares it to the dashboard printout, and writes evidence you can sign off.
+    </p>
+  </header>
+  <main>
+    <!-- Collects the service details and four source files. -->
+    <section>
+      <h2>1. Service and files</h2>
+      <div class="fields">
+        <div>
+          <label for="service_name">Service name</label>
+          <input id="service_name" type="text" placeholder="e.g. Asthma review, OAB, HF">
+        </div>
+        <div>
+          <label for="therapy_area">Therapy area</label>
+          <input id="therapy_area" type="text" placeholder="e.g. Respiratory, Urology, CVD">
+        </div>
+        <div>
+          <label for="dashboard_type">Dashboard type</label>
+          <select id="dashboard_type">
+            <option value="Baseline">Baseline</option>
+            <option value="Outcomes">Outcomes</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="profile">Logic profile</label>
+          <select id="profile"></select>
+        </div>
+      </div>
+      <div class="files">
+        <label class="drop" data-input="csv_file">
+          <strong>CLIICS upload</strong>
+          <span>CSV export from Generate CSV. Required.</span>
+          <div class="picked" id="csv_file_name">No file chosen</div>
+          <input id="csv_file" name="csv_file" type="file" accept=".csv,text/csv">
+        </label>
+        <label class="drop" data-input="sql_file">
+          <strong>Dashboard SQL</strong>
+          <span>.sql or Word SQL logic. Required.</span>
+          <div class="picked" id="sql_file_name">No file chosen</div>
+          <input id="sql_file" name="sql_file" type="file" accept=".sql,.docx,.txt">
+        </label>
+        <label class="drop" data-input="pdf_file">
+          <strong>Dashboard PDF</strong>
+          <span>Printout of the published dashboard.</span>
+          <div class="picked" id="pdf_file_name">No file chosen</div>
+          <input id="pdf_file" name="pdf_file" type="file" accept=".pdf,application/pdf">
+        </label>
+        <label class="drop" data-input="mapping_file">
+          <strong>Column mapping</strong>
+          <span>Excel: Column Name + SQL Column Name. Required.</span>
+          <div class="picked" id="mapping_file_name">No file chosen</div>
+          <input id="mapping_file" name="mapping_file" type="file" accept=".xlsx,.xls">
+        </label>
+      </div>
+      <div class="options">
+        <label><input id="full_rows" type="checkbox"> Include every CSV column on evidence sheets</label>
+      </div>
+      <button class="run" id="run_btn" type="button">Run accuracy check</button>
+      <p class="hint">
+        Profiles are optional. Auto-detect uses the service name, therapy area and file names.
+        Unknown services still run on the SQL, mapping and PDF alone.
+      </p>
+    </section>
+    <!-- Replaced with the run summary and download links after processing. -->
+    <section>
+      <h2>2. Results</h2>
+      <div id="results">
+        <p class="empty">Nothing run yet. Add the four files and start the check. Outputs stay on this machine under the outputs folder.</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    // Main page controls used while files are submitted and results are shown.
+    const profileSelect = document.getElementById("profile");
+    const results = document.getElementById("results");
+    const runBtn = document.getElementById("run_btn");
+
+    // Loads generic and service-specific profiles from the Python application.
+    fetch("/api/profiles")
+      .then(r => r.json())
+      .then(items => {
+        profileSelect.innerHTML = "";
+        items.forEach(item => {
+          const opt = document.createElement("option");
+          opt.value = item.id;
+          opt.textContent = item.name;
+          profileSelect.appendChild(opt);
+        });
+      });
+
+    // Shows the selected file names and supports drag-and-drop.
+    document.querySelectorAll(".drop").forEach(box => {
+      const input = document.getElementById(box.dataset.input);
+      const label = document.getElementById(box.dataset.input + "_name");
+      const show = () => {
+        label.textContent = input.files[0] ? input.files[0].name : "No file chosen";
+      };
+      input.addEventListener("change", show);
+      box.addEventListener("dragover", ev => { ev.preventDefault(); box.classList.add("over"); });
+      box.addEventListener("dragleave", () => box.classList.remove("over"));
+      box.addEventListener("drop", ev => {
+        ev.preventDefault();
+        box.classList.remove("over");
+        if (ev.dataTransfer.files.length) {
+          input.files = ev.dataTransfer.files;
+          show();
+        }
+      });
+    });
+
+    function pill(status) {
+      return `<span class="pill ${status}">${status}</span>`;
+    }
+
+    // Builds the result cards, helper summary, metric table and download links.
+    function render(data) {
+      const bits = [data.service_name, data.therapy_area, data.dashboard_type, data.profile_name].filter(Boolean);
+      const rows = (data.rows || []).map(row => `
+        <tr>
+          <td>${pill(row.status)}</td>
+          <td>${escapeHtml(row.chart || "")}</td>
+          <td>${escapeHtml(row.name || "")}</td>
+          <td>${row.csv_value ?? ""}</td>
+          <td>${row.dashboard_value ?? ""}</td>
+        </tr>`).join("");
+      const helpers = (data.helpers || []).map(h =>
+        `<tr><td>${pill(h.status)}</td><td>${escapeHtml(h.name)}</td><td>${h.mismatches}</td></tr>`
+      ).join("");
+      results.innerHTML = `
+        <div class="meta">${escapeHtml(bits.join(" · "))} · ${data.csv_rows ?? "?"} patients in CSV · ${data.mapping_fields} mapped fields</div>
+        <div class="stats">
+          <div class="stat"><b>${data.metrics}</b><small>SQL metrics</small></div>
+          <div class="stat match"><b>${data.match}</b><small>Match</small></div>
+          <div class="stat mismatch"><b>${data.mismatch}</b><small>Mismatch</small></div>
+          <div class="stat review"><b>${data.csv_only}</b><small>CSV only / review</small></div>
+        </div>
+        <div class="downloads">
+          <a href="${data.downloads.evidence}">Evidence workbook</a>
+          <a href="${data.downloads.report}">QA report</a>
+          <a href="${data.downloads.json}">JSON results</a>
+          <a href="${data.downloads.zip}">Full pack (zip)</a>
+        </div>
+        ${helpers ? `<p class="meta">Helper checks: ${data.helpers_passed}/${data.helpers_total} passed</p>
+        <div class="table-wrap" style="max-height:160px;margin-bottom:12px">
+          <table><thead><tr><th>Status</th><th>Check</th><th>Mismatches</th></tr></thead><tbody>${helpers}</tbody></table>
+        </div>` : ""}
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Status</th><th>Chart</th><th>Metric</th><th>CSV</th><th>Dashboard</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function escapeHtml(value) {
+      // Keeps uploaded names and messages safe when displayed on the page.
+      return String(value).replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    // Packages the form as an upload, starts the check and displays its response.
+    runBtn.addEventListener("click", async () => {
+      const csv = document.getElementById("csv_file").files[0];
+      const sql = document.getElementById("sql_file").files[0];
+      const mapping = document.getElementById("mapping_file").files[0];
+      if (!csv || !sql || !mapping) {
+        results.innerHTML = `<div class="error-banner">Add the CLIICS CSV, SQL file and mapping workbook before running. The PDF is recommended.</div>`;
+        return;
+      }
+      const body = new FormData();
+      body.append("service_name", document.getElementById("service_name").value);
+      body.append("therapy_area", document.getElementById("therapy_area").value);
+      body.append("dashboard_type", document.getElementById("dashboard_type").value);
+      body.append("profile", profileSelect.value);
+      body.append("full_rows", document.getElementById("full_rows").checked ? "1" : "0");
+      body.append("csv_file", csv);
+      body.append("sql_file", sql);
+      body.append("mapping_file", mapping);
+      const pdf = document.getElementById("pdf_file").files[0];
+      if (pdf) body.append("pdf_file", pdf);
+
+      runBtn.disabled = true;
+      runBtn.textContent = "Running accuracy check…";
+      results.innerHTML = `<p class="empty">Replicating SQL counts from the CSV and comparing them to the dashboard printout. This can take a short while.</p>`;
+      try {
+        const res = await fetch("/api/run", { method: "POST", body });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "The check failed.");
+        render(data);
+      } catch (err) {
+        results.innerHTML = `<div class="error-banner">${escapeHtml(err.message)}</div>`;
+      } finally {
+        runBtn.disabled = false;
+        runBtn.textContent = "Run accuracy check";
+      }
+    });
+  </script>
+</body>
+</html>
